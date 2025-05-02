@@ -20,12 +20,12 @@ import {
   getAccountAddress,
   getAccountInitCode,
   getBalance, deployEntryPoint, decodeRevertReason, findSimulationUserOpWithMin, findUserOpWithMin
-} from './testutils'
+} from './zklogin/testutils'
 
 import { fillAndSign, fillSignAndPack, packUserOp, simulateHandleOp, simulateValidation } from './UserOp'
 import { BigNumber, Wallet } from 'ethers'
 import { hexConcat, parseEther } from 'ethers/lib/utils'
-import { UserOperation } from './UserOperation'
+import { UserOperation } from './zklogin/UserOperation'
 
 const provider = ethers.provider
 describe('EntryPointSimulations', function () {

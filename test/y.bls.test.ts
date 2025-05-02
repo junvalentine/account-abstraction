@@ -12,7 +12,7 @@ import {
   EntryPoint
 } from '../typechain'
 import { ethers } from 'hardhat'
-import { createAddress, deployEntryPoint, fund, ONE_ETH } from './testutils'
+import { createAddress, deployEntryPoint, fund, ONE_ETH } from './zklogin/testutils'
 import { DefaultsForUserOp, fillAndPack, packUserOp, simulateValidation } from './UserOp'
 import { expect } from 'chai'
 import { keccak256 } from 'ethereumjs-util'

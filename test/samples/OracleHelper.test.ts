@@ -1,7 +1,7 @@
 import { assert } from 'chai'
 import { ethers } from 'hardhat'
 
-import { AddressZero } from '../testutils'
+import { AddressZero } from '../zklogin/testutils'
 
 import {
   EntryPoint,

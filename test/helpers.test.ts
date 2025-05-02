@@ -1,5 +1,5 @@
 import './aa.init'
-import { AddressZero, packValidationData, parseValidationData } from './testutils'
+import { AddressZero, packValidationData, parseValidationData } from './zklogin/testutils'
 import { expect } from 'chai'
 import { hexlify } from 'ethers/lib/utils'
 import { TestHelpers, TestHelpers__factory } from '../typechain'

@@ -14,7 +14,7 @@ import {
   UniswapHelper as UniswapHelperNamespace
 } from '../typechain/contracts/samples/TokenPaymaster'
 import { BigNumber } from 'ethers'
-import { createAccountOwner } from '../test/testutils'
+import { createAccountOwner } from '../test/zklogin/testutils'
 // const ethersSigner = ethers.provider.getSigner()
 
 context('Token Paymaster', function () {

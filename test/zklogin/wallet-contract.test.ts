@@ -3,14 +3,12 @@ import { ethers } from 'hardhat'
 import { expect } from 'chai'
 import {
   ERC1967Proxy__factory,
-  SimpleAccount,
-  SimpleAccountFactory__factory,
-  SimpleAccount__factory,
-  TestCounter,
-  TestCounter__factory,
+  WalletContract,
+  WalletContractFactory__factory,
+  WalletContract__factory,
   TestUtil,
   TestUtil__factory
-} from '../typechain'
+} from '../../typechain'
 import {
   createAccount,
   createAddress,
@@ -19,12 +17,14 @@ import {
   isDeployed,
   ONE_ETH,
   HashZero, deployEntryPoint
-} from './zklogin/testutils'
-import { fillUserOpDefaults, getUserOpHash, encodeUserOp, signUserOp, packUserOp } from './UserOp'
+} from './testutils'
+import { fillUserOpDefaults, getUserOpHash, encodeUserOp, signUserOpWithZkProof, packUserOp } from './UserOp'
 import { parseEther } from 'ethers/lib/utils'
-import { UserOperation } from './zklogin/UserOperation'
+import { UserOperation } from './UserOperation'
+const fs = require('fs');
 
-describe('SimpleAccount', function () {
+describe('test WalletContract', function () {
+  this.timeout(120000);
   let entryPoint: string
   let accounts: string[]
   let testUtil: TestUtil
@@ -58,48 +58,8 @@ describe('SimpleAccount', function () {
     expect(await testUtil.encodeUserOp(packed)).to.equal(encoded)
   })
 
-  describe('#executeBatch', () => {
-    let account: SimpleAccount
-    let counter: TestCounter
-    before(async () => {
-      ({ proxy: account } = await createAccount(ethersSigner, await ethersSigner.getAddress(), entryPoint))
-      counter = await new TestCounter__factory(ethersSigner).deploy()
-    })
-
-    it('should allow zero value array', async () => {
-      const counterJustEmit = await counter.populateTransaction.justemit().then(tx => tx.data!)
-      const rcpt = await account.executeBatch(
-        [counter.address, counter.address],
-        [],
-        [counterJustEmit, counterJustEmit]
-      ).then(async t => await t.wait())
-      const targetLogs = await counter.queryFilter(counter.filters.CalledFrom(), rcpt.blockHash)
-      expect(targetLogs.length).to.eq(2)
-    })
-
-    it('should allow transfer value', async () => {
-      const counterJustEmit = await counter.populateTransaction.justemit().then(tx => tx.data!)
-      const target = createAddress()
-      await ethersSigner.sendTransaction({ from: accounts[0], to: account.address, value: parseEther('2') })
-      const rcpt = await account.executeBatch(
-        [target, counter.address],
-        [ONE_ETH, 0],
-        ['0x', counterJustEmit]
-      ).then(async t => await t.wait())
-      expect(await ethers.provider.getBalance(target)).to.equal(ONE_ETH)
-      const targetLogs = await counter.queryFilter(counter.filters.CalledFrom(), rcpt.blockHash)
-      expect(targetLogs.length).to.eq(1)
-    })
-
-    it('should fail with wrong array length', async () => {
-      const counterJustEmit = await counter.populateTransaction.justemit().then(tx => tx.data!)
-      await expect(account.executeBatch([counter.address, counter.address], [0], [counterJustEmit, counterJustEmit]))
-        .to.be.revertedWith('wrong array lengths')
-    })
-  })
-
   describe('#validateUserOp', () => {
-    let account: SimpleAccount
+    let account: WalletContract
     let userOp: UserOperation
     let userOpHash: string
     let preBalance: number
@@ -112,24 +72,40 @@ describe('SimpleAccount', function () {
     before(async () => {
       entryPointEoa = accounts[2]
       const epAsSigner = await ethers.getSigner(entryPointEoa)
-
-      // cant use "SimpleAccountFactory", since it attempts to increment nonce first
-      const implementation = await new SimpleAccount__factory(ethersSigner).deploy(entryPointEoa)
+      // console.log('epAsSigner:', epAsSigner.address)
+      // cant use "WalletContractFactory", since it attempts to increment nonce first
+      const implementation = await new WalletContract__factory(ethersSigner).deploy(entryPointEoa)
+      // console.log('implementation:', implementation.address)
       const proxy = await new ERC1967Proxy__factory(ethersSigner).deploy(implementation.address, '0x')
-      account = SimpleAccount__factory.connect(proxy.address, epAsSigner)
-
+      account = WalletContract__factory.connect(proxy.address, epAsSigner)
+      // console.log('account:', account.address)
       await ethersSigner.sendTransaction({ from: accounts[0], to: account.address, value: parseEther('0.2') })
       const callGasLimit = 200000
-      const verificationGasLimit = 100000
+      const verificationGasLimit = 1000000
       const maxFeePerGas = 3e9
       const chainId = await ethers.provider.getNetwork().then(net => net.chainId)
-
-      userOp = signUserOp(fillUserOpDefaults({
+      
+      // Read ZK proof data from proof.json file
+      const proofData = JSON.parse(fs.readFileSync('test/zklogin/proof.json', 'utf8'));
+      // Read public signals from public.json file
+      const publicData = JSON.parse(fs.readFileSync('test/zklogin/public.json', 'utf8'));
+      
+      const zkProof = {
+        pA: proofData.pi_a.slice(0, 2).map(BigInt),
+        pB: [
+          [BigInt(proofData.pi_b[0][1]), BigInt(proofData.pi_b[0][0])],
+          [BigInt(proofData.pi_b[1][1]), BigInt(proofData.pi_b[1][0])]
+        ],
+        pC: proofData.pi_c.slice(0, 2).map(BigInt),
+        pubSignals: publicData.map(BigInt)
+      };
+      // console.log('ZK Proof loaded:', JSON.stringify(zkProof, (_, v) => typeof v === 'bigint' ? v.toString() : v));
+      userOp = signUserOpWithZkProof(fillUserOpDefaults({
         sender: account.address,
         callGasLimit,
         verificationGasLimit,
         maxFeePerGas
-      }), accountOwner, entryPointEoa, chainId)
+      }), accountOwner, entryPointEoa, chainId, zkProof)
 
       userOpHash = await getUserOpHash(userOp, entryPointEoa, chainId)
 
@@ -154,13 +130,18 @@ describe('SimpleAccount', function () {
     })
   })
 
-  context('SimpleAccountFactory', () => {
+  context('WalletContractFactory', () => {
     it('sanity: check deployer', async () => {
+      const proofData = JSON.parse(fs.readFileSync('test/zklogin/public.json', 'utf8'));
+      const salt = proofData[1]; // Reading salt from index 1 of proof.json array
+      // console.log('Salt value from proof.json:', salt);
+
       const ownerAddr = createAddress()
-      const deployer = await new SimpleAccountFactory__factory(ethersSigner).deploy(entryPoint)
-      const target = await deployer.callStatic.createAccount(ownerAddr, 1234)
+      const deployer = await new WalletContractFactory__factory(ethersSigner).deploy(entryPoint)
+      const target = await deployer.callStatic.createAccount(ownerAddr, salt)
+      // console.log('Target address:', target)
       expect(await isDeployed(target)).to.eq(false)
-      await deployer.createAccount(ownerAddr, 1234)
+      await deployer.createAccount(ownerAddr, salt)
       expect(await isDeployed(target)).to.eq(true)
     })
   })

@@ -23,10 +23,10 @@ import {
   ONE_ETH,
   createAccount,
   getAccountAddress, decodeRevertReason
-} from './testutils'
+} from './zklogin/testutils'
 import { fillSignAndPack, simulateValidation } from './UserOp'
 import { hexConcat, parseEther } from 'ethers/lib/utils'
-import { PackedUserOperation } from './UserOperation'
+import { PackedUserOperation } from './zklogin/UserOperation'
 import { hexValue } from '@ethersproject/bytes'
 
 describe('EntryPoint with paymaster', function () {

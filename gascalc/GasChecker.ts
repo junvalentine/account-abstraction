@@ -7,7 +7,7 @@ import {
   createAddress,
   createAccountOwner,
   deployEntryPoint, decodeRevertReason
-} from '../test/testutils'
+} from '../test/zklogin/testutils'
 import {
   EntryPoint, EntryPoint__factory, SimpleAccountFactory,
   SimpleAccountFactory__factory, SimpleAccount__factory
@@ -20,7 +20,7 @@ import { table, TableUserConfig } from 'table'
 import { Create2Factory } from '../src/Create2Factory'
 import * as fs from 'fs'
 import { SimpleAccountInterface } from '../typechain/contracts/samples/SimpleAccount'
-import { PackedUserOperation } from '../test/UserOperation'
+import { PackedUserOperation } from '../test/zklogin/UserOperation'
 import { expect } from 'chai'
 
 const gasCheckerLogFile = './reports/gas-checker.txt'

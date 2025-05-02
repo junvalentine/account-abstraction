@@ -2,8 +2,8 @@ import './aa.init'
 import { BigNumber, Event, Wallet } from 'ethers'
 import { expect } from 'chai'
 import {
-  SimpleAccount,
-  SimpleAccountFactory,
+  WalletContract,
+  WalletContractFactory,
   TestAggregatedAccount__factory,
   TestAggregatedAccountFactory__factory,
   TestCounter,
@@ -22,7 +22,7 @@ import {
   TestWarmColdAccount__factory,
   TestPaymasterRevertCustomError__factory,
   IEntryPoint__factory,
-  SimpleAccountFactory__factory,
+  WalletContractFactory__factory,
   IStakeManager__factory,
   INonceManager__factory,
   EntryPoint,
@@ -48,9 +48,9 @@ import {
   createAccount,
   getAggregatedAccountInitCode,
   decodeRevertReason, parseValidationData, findUserOpWithMin
-} from './testutils'
+} from './zklogin/testutils'
 import { DefaultsForUserOp, fillAndSign, fillSignAndPack, getUserOpHash, packUserOp, simulateValidation } from './UserOp'
-import { PackedUserOperation, UserOperation } from './UserOperation'
+import { PackedUserOperation, UserOperation } from './zklogin/UserOperation'
 import { PopulatedTransaction } from 'ethers/lib/ethers'
 import { ethers } from 'hardhat'
 import { arrayify, defaultAbiCoder, hexZeroPad, parseEther } from 'ethers/lib/utils'
@@ -62,11 +62,11 @@ import { UserOperationEventEvent } from '../typechain/contracts/interfaces/IEntr
 
 describe('EntryPoint', function () {
   let entryPoint: EntryPoint
-  let simpleAccountFactory: SimpleAccountFactory
+  let WalletContractFactory: WalletContractFactory
 
   let accountOwner: Wallet
   const ethersSigner = ethers.provider.getSigner()
-  let account: SimpleAccount
+  let account: WalletContract
 
   const globalUnstakeDelaySec = 2
   const paymasterStake = ethers.utils.parseEther('2')
@@ -82,7 +82,7 @@ describe('EntryPoint', function () {
     accountOwner = createAccountOwner();
     ({
       proxy: account,
-      accountFactory: simpleAccountFactory
+      accountFactory: WalletContractFactory
     } = await createAccount(ethersSigner, await accountOwner.getAddress(), entryPoint.address))
     await fund(account)
 
@@ -213,9 +213,9 @@ describe('EntryPoint', function () {
       })
     })
     describe('with deposit', () => {
-      let account: SimpleAccount
+      let account: WalletContract
       before(async () => {
-        ({ proxy: account } = await createAccount(ethersSigner, await ethersSigner.getAddress(), entryPoint.address, simpleAccountFactory))
+        ({ proxy: account } = await createAccount(ethersSigner, await ethersSigner.getAddress(), entryPoint.address, WalletContractFactory))
         await account.addDeposit({ value: ONE_ETH })
         expect(await getBalance(account.address)).to.equal(0)
         expect(await account.getDeposit()).to.eql(ONE_ETH)
@@ -234,8 +234,8 @@ describe('EntryPoint', function () {
     // note: for the actual opcode and storage rule restrictions see the reference bundler ValidationManager
     it('should not use banned ops during simulateValidation', async () => {
       const op1 = await fillSignAndPack({
-        initCode: getAccountInitCode(accountOwner1.address, simpleAccountFactory),
-        sender: await getAccountAddress(accountOwner1.address, simpleAccountFactory)
+        initCode: getAccountInitCode(accountOwner1.address, WalletContractFactory),
+        sender: await getAccountAddress(accountOwner1.address, WalletContractFactory)
       }, accountOwner1, entryPoint)
       await fund(op1.sender)
       await simulateValidation(op1, entryPoint.address, { gasLimit: 10e6 })
@@ -836,7 +836,7 @@ describe('EntryPoint', function () {
 
       it('should reject create if sender address is wrong', async () => {
         const op = await fillSignAndPack({
-          initCode: getAccountInitCode(accountOwner.address, simpleAccountFactory),
+          initCode: getAccountInitCode(accountOwner.address, WalletContractFactory),
           verificationGasLimit: 2e6,
           sender: '0x'.padEnd(42, '1')
         }, accountOwner, entryPoint)
@@ -848,7 +848,7 @@ describe('EntryPoint', function () {
 
       it('should reject create if account not funded', async () => {
         const op = await fillSignAndPack({
-          initCode: getAccountInitCode(accountOwner.address, simpleAccountFactory, 100),
+          initCode: getAccountInitCode(accountOwner.address, WalletContractFactory, 100),
           verificationGasLimit: 2e6
         }, accountOwner, entryPoint)
 
@@ -864,10 +864,10 @@ describe('EntryPoint', function () {
 
       it('should succeed to create account after prefund', async () => {
         const salt = 20
-        const preAddr = await getAccountAddress(accountOwner.address, simpleAccountFactory, salt)
+        const preAddr = await getAccountAddress(accountOwner.address, WalletContractFactory, salt)
         await fund(preAddr)
         createOp = await fillSignAndPack({
-          initCode: getAccountInitCode(accountOwner.address, simpleAccountFactory, salt),
+          initCode: getAccountInitCode(accountOwner.address, WalletContractFactory, salt),
           callGasLimit: 1e6,
           verificationGasLimit: 2e6
 
@@ -887,7 +887,7 @@ describe('EntryPoint', function () {
       })
 
       it('should reject if account already created', async function () {
-        const preAddr = await getAccountAddress(accountOwner.address, simpleAccountFactory)
+        const preAddr = await getAccountAddress(accountOwner.address, WalletContractFactory)
         if (await ethers.provider.getCode(preAddr).then(x => x.length) === 2) {
           this.skip()
         }
@@ -915,19 +915,19 @@ describe('EntryPoint', function () {
       const accountOwner1 = createAccountOwner()
       let account1: string
       const accountOwner2 = createAccountOwner()
-      let account2: SimpleAccount
+      let account2: WalletContract
 
       before('before', async () => {
         counter = await new TestCounter__factory(ethersSigner).deploy()
         const count = await counter.populateTransaction.count()
         accountExecCounterFromEntryPoint = await account.populateTransaction.execute(counter.address, 0, count.data!)
-        account1 = await getAccountAddress(accountOwner1.address, simpleAccountFactory);
+        account1 = await getAccountAddress(accountOwner1.address, WalletContractFactory);
         ({ proxy: account2 } = await createAccount(ethersSigner, await accountOwner2.getAddress(), entryPoint.address))
         await fund(account1)
         await fund(account2.address)
         // execute and increment counter
         const op1 = await fillSignAndPack({
-          initCode: getAccountInitCode(accountOwner1.address, simpleAccountFactory),
+          initCode: getAccountInitCode(accountOwner1.address, WalletContractFactory),
           callData: accountExecCounterFromEntryPoint.data,
           callGasLimit: 2e6,
           verificationGasLimit: 2e6
@@ -1161,7 +1161,7 @@ describe('EntryPoint', function () {
           paymaster: pm,
           paymasterVerificationGasLimit: 3e6,
           callData: accountExecFromEntryPoint.data,
-          initCode: getAccountInitCode(account2Owner.address, simpleAccountFactory),
+          initCode: getAccountInitCode(account2Owner.address, WalletContractFactory),
           verificationGasLimit: 3e6,
           callGasLimit: 1e6
         }, account2Owner, entryPoint)
@@ -1173,7 +1173,7 @@ describe('EntryPoint', function () {
           paymaster: paymaster.address,
           paymasterVerificationGasLimit: 3e6,
           callData: accountExecFromEntryPoint.data,
-          initCode: getAccountInitCode(account2Owner.address, simpleAccountFactory),
+          initCode: getAccountInitCode(account2Owner.address, WalletContractFactory),
 
           verificationGasLimit: 3e6,
           callGasLimit: 1e6
@@ -1194,7 +1194,7 @@ describe('EntryPoint', function () {
           paymasterPostOpGasLimit: 1e5,
           paymasterVerificationGasLimit: 3e6,
           callData: accountExecFromEntryPoint.data,
-          initCode: getAccountInitCode(account3Owner.address, simpleAccountFactory),
+          initCode: getAccountInitCode(account3Owner.address, WalletContractFactory),
 
           verificationGasLimit: 3e6,
           callGasLimit: 1e6
@@ -1218,7 +1218,7 @@ describe('EntryPoint', function () {
         const op = await fillSignAndPack({
           paymaster: errorPostOp.address,
           callData: accountExecFromEntryPoint.data,
-          initCode: getAccountInitCode(account3Owner.address, simpleAccountFactory),
+          initCode: getAccountInitCode(account3Owner.address, WalletContractFactory),
 
           verificationGasLimit: 3e6,
           callGasLimit: 1e6
@@ -1235,7 +1235,7 @@ describe('EntryPoint', function () {
           paymaster: paymaster.address,
           paymasterVerificationGasLimit: 1e6,
           callData: accountExecFromEntryPoint.data,
-          initCode: getAccountInitCode(account2Owner.address, simpleAccountFactory)
+          initCode: getAccountInitCode(account2Owner.address, WalletContractFactory)
         }, account2Owner, entryPoint)
         const beneficiaryAddress = createAddress()
 
@@ -1253,7 +1253,7 @@ describe('EntryPoint', function () {
           paymaster: paymaster.address,
           paymasterVerificationGasLimit: 1e6,
           callData: accountExecFromEntryPoint.data,
-          initCode: getAccountInitCode(anOwner.address, simpleAccountFactory)
+          initCode: getAccountInitCode(anOwner.address, WalletContractFactory)
         }, anOwner, entryPoint)
 
         const { paymasterInfo } = await simulateValidation(op, entryPoint.address)
@@ -1394,7 +1394,7 @@ describe('EntryPoint', function () {
     })
 
     it('should return false for a wrong interface', async function () {
-      const saInterface = SimpleAccountFactory__factory.createInterface()
+      const saInterface = WalletContractFactory__factory.createInterface()
       const entryPointInterfaceID = getERC165InterfaceID([...saInterface.fragments])
       expect(await entryPoint.supportsInterface(entryPointInterfaceID)).to.equal(false)
     })

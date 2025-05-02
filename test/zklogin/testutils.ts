@@ -13,18 +13,18 @@ import {
   EntryPoint,
   EntryPoint__factory,
   IERC20,
-  SimpleAccount,
-  SimpleAccountFactory__factory,
-  SimpleAccount__factory,
-  SimpleAccountFactory,
+  WalletContract,
+  WalletContractFactory__factory,
+  WalletContract__factory,
+  WalletContractFactory,
   TestAggregatedAccountFactory, TestPaymasterRevertCustomError__factory, TestERC20__factory
-} from '../typechain'
+} from '../../typechain'
 import { BytesLike, Hexable } from '@ethersproject/bytes'
 import { expect } from 'chai'
-import { Create2Factory } from '../src/Create2Factory'
-import { debugTransaction } from './debugTx'
+import { Create2Factory } from '../../src/Create2Factory'
+import { debugTransaction } from '../debugTx'
 import { UserOperation } from './UserOperation'
-import { packUserOp, simulateValidation } from './UserOp'
+import { packUserOp, simulateValidation } from '../UserOp'
 
 export const AddressZero = ethers.constants.AddressZero
 export const HashZero = ethers.constants.HashZero
@@ -98,7 +98,7 @@ export async function calcGasUsage (rcpt: ContractReceipt, entryPoint: EntryPoin
 }
 
 // helper function to create the initCode to deploy the account, using our account factory.
-export function getAccountInitCode (owner: string, factory: SimpleAccountFactory, salt = 0): BytesLike {
+export function getAccountInitCode (owner: string, factory: WalletContractFactory, salt = 0): BytesLike {
   return hexConcat([
     factory.address,
     factory.interface.encodeFunctionData('createAccount', [owner, salt])
@@ -115,7 +115,7 @@ export async function getAggregatedAccountInitCode (entryPoint: string, factory:
 }
 
 // given the parameters as AccountDeployer, return the resulting "counterfactual address" that it would create.
-export async function getAccountAddress (owner: string, factory: SimpleAccountFactory, salt = 0): Promise<string> {
+export async function getAccountAddress (owner: string, factory: WalletContractFactory, salt = 0): Promise<string> {
   return await factory.getAddress(owner, salt)
 }
 
@@ -289,18 +289,18 @@ export async function createAccount (
   ethersSigner: Signer,
   accountOwner: string,
   entryPoint: string,
-  _factory?: SimpleAccountFactory
+  _factory?: WalletContractFactory
 ):
   Promise<{
-    proxy: SimpleAccount
-    accountFactory: SimpleAccountFactory
+    proxy: WalletContract
+    accountFactory: WalletContractFactory
     implementation: string
   }> {
-  const accountFactory = _factory ?? await new SimpleAccountFactory__factory(ethersSigner).deploy(entryPoint)
+  const accountFactory = _factory ?? await new WalletContractFactory__factory(ethersSigner).deploy(entryPoint)
   const implementation = await accountFactory.accountImplementation()
   await accountFactory.createAccount(accountOwner, 0)
   const accountAddress = await accountFactory.getAddress(accountOwner, 0)
-  const proxy = SimpleAccount__factory.connect(accountAddress, ethersSigner)
+  const proxy = WalletContract__factory.connect(accountAddress, ethersSigner)
   return {
     implementation,
     accountFactory,

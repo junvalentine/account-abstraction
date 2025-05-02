@@ -31,7 +31,7 @@ import {
   decodeRevertReason,
   deployEntryPoint,
   fund, objdump
-} from '../testutils'
+} from '../zklogin/testutils'
 
 import { fillUserOp, packUserOp, signUserOp } from '../UserOp'
 

@@ -12,10 +12,10 @@ import {
   createAccount,
   createAccountOwner, createAddress, decodeRevertReason,
   deployEntryPoint, packPaymasterData, parseValidationData
-} from './testutils'
+} from './zklogin/testutils'
 import { DefaultsForUserOp, fillAndSign, fillSignAndPack, packUserOp, simulateValidation } from './UserOp'
 import { arrayify, defaultAbiCoder, hexConcat, parseEther } from 'ethers/lib/utils'
-import { PackedUserOperation } from './UserOperation'
+import { PackedUserOperation } from './zklogin/UserOperation'
 
 const MOCK_VALID_UNTIL = '0x00000000deadbeef'
 const MOCK_VALID_AFTER = '0x0000000000001234'
